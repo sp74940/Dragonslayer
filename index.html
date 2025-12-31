@@ -3,125 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dragon Slayer - Debug Mode</title>
+    <title>Dragon Slayer - Debug Screen</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: monospace;
             background-color: #1a1a2e;
             color: #e94560;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             margin: 0;
             height: 100vh;
-            user-select: none;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            touch-action: manipulation;
         }
 
-        /* --- CONSOLE DE DEBUG --- */
-        #debug-console {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 30%;
-            background: rgba(0, 0, 0, 0.8);
+        /* --- ZONE DE COMBAT UTILISÉE COMME CONSOLE --- */
+        #game-area {
+            position: relative;
+            width: 95%;
+            margin: 10px auto;
+            flex-grow: 1;
+            background-color: #000;
+            border: 2px solid #e94560;
+            border-radius: 10px;
             color: #00ff00;
-            font-family: monospace;
-            font-size: 10px;
+            font-size: 11px;
             text-align: left;
+            padding: 10px;
             overflow-y: auto;
-            padding: 5px;
-            z-index: 100;
-            pointer-events: none; /* Ne gêne pas les clics sur le jeu */
-            border-bottom: 1px solid #00ff00;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         .hud {
-            width: 92%;
+            width: 95%;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 32%; /* Laisse de la place pour la console */
-            font-weight: bold;
-            color: white;
-            background-color: #16213e;
             padding: 10px;
-            border-radius: 15px;
-            border: 1px solid #0f3460;
+            background: #16213e;
+            margin: 5px auto;
+            border-radius: 10px;
             box-sizing: border-box;
-        }
-
-        #dragon-portrait {
-            width: 12.5vw; height: 12.5vw;
-            max-width: 50px; border-radius: 5px;
-            border: 2px solid #e94560; margin-right: 10px;
-            background-color: #0f3460; object-fit: contain;
-        }
-
-        #game-area {
-            position: relative; width: 90%; flex-grow: 1;
-            background-color: #16213e; border-radius: 10px;
-            margin: 10px; overflow: hidden;
+            color: white;
         }
 
         #monster {
-            width: 15%; height: auto; aspect-ratio: 1/1;
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            transition: transform 0.05s, top 0.15s, left 0.15s;
-            object-fit: contain; z-index: 5;
+            width: 60px; height: 60px;
+            position: absolute;
+            bottom: 10px; right: 10px;
+            z-index: 100;
+            border: 1px solid #fff;
         }
 
-        #health-bar-container {
-            width: 90%; height: 15px; background-color: #0f3460;
-            border-radius: 10px; margin-bottom: 5px; overflow: hidden;
-        }
-        #health-bar { width: 100%; height: 100%; background-color: #e94560; transition: width 0.2s; }
-
-        #shop { background-color: #16213e; width: 100%; padding: 10px 0; border-top: 2px solid #0f3460; }
-
+        #shop { background-color: #16213e; padding: 10px; border-top: 2px solid #0f3460; }
         .shop-btn {
-            background-color: #0f3460; border: 1px solid #e94560;
-            padding: 12px; margin: 5px; border-radius: 5px;
-            font-weight: bold; color: white; width: 85%;
+            background-color: #e94560; border: none; padding: 15px; 
+            color: white; font-weight: bold; width: 90%; border-radius: 5px;
         }
-        
-        #wallet-status { font-size: 11px; color: #4caf50; margin: 5px 0; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="debug-console">--- SYSTEM LOG ---<br></div>
-    
-    <div id="wallet-status" onclick="connectWallet()">⏳ Status: Initializing...</div>
-    
     <div class="hud">
-        <div class="hud-left">
-            <img id="dragon-portrait" src="img/dragon1.png" alt="P">
-            <span style="font-size: 16px;">Lvl <span id="level-display">1</span>/4</span>
-        </div>
-        <span id="hp-text" style="font-size: 14px;">HP</span>
+        <span id="wallet-status">Status: Waiting...</span>
+        <span>Lvl <span id="level-display">1</span></span>
     </div>
-    
-    <div id="health-bar-container"><div id="health-bar"></div></div>
 
-    <div id="game-area">
-        <img id="monster" src="img/dragon1.png" onclick="attackMonster()" alt="M">
-    </div>
+    <div id="game-area">--- DÉBUT DU LOG SYSTÈME ---
+</div>
+
+    <img id="monster" src="img/dragon1.png" onclick="attackMonster()">
 
     <div id="shop">
-        <button class="shop-btn" id="btn-weapon" onclick="buyItem('weapon', '0.01')">
-            ⚔️ Épée (+5 Dmg) - 0.01 USDT
-        </button>
+        <button class="shop-btn" onclick="buyItem('weapon', '0.01')">TEST ACHAT 0.01 USDT</button>
     </div>
 
     <script>
-        const debug = document.getElementById('debug-console');
+        const logArea = document.getElementById('game-area');
+        
         function log(msg) {
-            debug.innerHTML += "> " + msg + "<br>";
-            debug.scrollTop = debug.scrollHeight;
-            console.log(msg);
+            const t = new Date().toLocaleTimeString();
+            logArea.innerHTML += `[${t}] ${msg}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
         }
 
         const usdtAddress = "0x48065fbBE25f71C9282dd5e1cD6D6A887483D5e";
@@ -129,107 +94,73 @@
         const tokenAbi = ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"];
         
         let provider, signer, userAddress;
-
-        const hpPerLevel = [5, 10, 20, 40];
-        let level = 1, damage = 1, maxHp = 5, currentHp = 5;
-        
-        const monsterEl = document.getElementById('monster');
-        const portraitEl = document.getElementById('dragon-portrait');
-
-        updateVisuals(); updateUI();
+        let level = 1, currentHp = 5, damage = 1;
 
         function attackMonster() {
-            if (currentHp <= 0) return;
+            log("Clic sur le dragon !");
             currentHp -= damage;
-            monsterEl.style.transform = "translate(-50%, -50%) scale(0.8) rotate(" + (Math.random()*12 - 6) + "deg)";
-            setTimeout(() => { monsterEl.style.transform = "translate(-50%, -50%) scale(1)"; }, 50);
-            if (currentHp <= 0) defeatMonster();
-            else { updateUI(); moveMonster(); }
-        }
-
-        function moveMonster() {
-            const min = 15, max = 85;
-            monsterEl.style.left = (Math.random() * (max - min) + min) + "%";
-            monsterEl.style.top = (Math.random() * (max - min) + min) + "%";
-        }
-
-        function defeatMonster() {
-            if (level >= 4) { alert("🏆 VICTOIRE !"); restartGame(); }
-            else {
-                level++; maxHp = hpPerLevel[level-1]; currentHp = maxHp;
-                updateVisuals(); updateUI();
+            if (currentHp <= 0) {
+                level++;
+                currentHp = level * 5;
+                document.getElementById('level-display').textContent = level;
+                document.getElementById('monster').src = "img/dragon" + (level > 4 ? 4 : level) + ".png";
+                log("Niveau Supérieur : " + level);
             }
         }
 
-        function restartGame() { level = 1; maxHp = 5; currentHp = 5; damage = 1; updateVisuals(); updateUI(); }
-
-        function updateVisuals() {
-            monsterEl.src = "img/dragon" + level + ".png";
-            portraitEl.src = "img/dragon" + level + ".png";
-        }
-
-        function updateUI() {
-            document.getElementById('health-bar').style.width = (currentHp / maxHp * 100) + "%";
-            document.getElementById('hp-text').textContent = currentHp + "/" + maxHp + " HP";
-            document.getElementById('level-display').textContent = level;
-        }
-
-        // --- LOGIQUE DE CONNEXION VERBEUSE ---
         async function connectWallet() {
-            log("Attempting connection...");
+            log("Recherche de window.ethereum...");
             
-            if (typeof window.ethereum !== 'undefined') {
-                log("window.ethereum detected.");
-                log("isMiniPay: " + window.ethereum.isMiniPay);
+            if (window.ethereum) {
+                log("window.ethereum TROUVÉ.");
+                log("isMiniPay: " + (window.ethereum.isMiniPay || "false"));
                 
                 try {
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    log("Provider initialized.");
-
-                    log("Requesting accounts...");
+                    log("Demande d'accès aux comptes (eth_requestAccounts)...");
                     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     
-                    if (accounts.length > 0) {
+                    if (accounts && accounts.length > 0) {
                         userAddress = accounts[0];
+                        provider = new ethers.providers.Web3Provider(window.ethereum);
                         signer = provider.getSigner();
-                        log("Account connected: " + userAddress);
-                        document.getElementById('wallet-status').textContent = "🟢 " + userAddress.substring(0,8);
+                        
+                        log("SUCCÈS ! Adresse: " + userAddress);
+                        document.getElementById('wallet-status').textContent = "Connecté: " + userAddress.substring(0,6);
                     } else {
-                        log("Error: No accounts returned.");
+                        log("ERREUR: Liste de comptes vide.");
                     }
-                } catch (error) {
-                    log("CRITICAL ERROR: " + error.message);
-                    if (error.code) log("Error code: " + error.code);
-                    document.getElementById('wallet-status').textContent = "🔴 Connection Refused";
+                } catch (e) {
+                    log("ERREUR DE CONNEXION: " + e.message);
+                    if (e.code) log("CODE ERREUR: " + e.code);
                 }
             } else {
-                log("ERROR: window.ethereum is undefined.");
-                document.getElementById('wallet-status').textContent = "🔴 MiniPay not detected";
+                log("ERREUR: window.ethereum est indéfini.");
+                log("Vérifiez que vous êtes bien dans l'app Opera Mini / MiniPay.");
             }
         }
 
-        // Lancement différé
+        // Démarrage
         window.addEventListener('load', () => {
-            log("Page loaded. Waiting 2s for injection...");
-            setTimeout(connectWallet, 2000);
+            log("Page chargée. Attente de 1.5s...");
+            setTimeout(connectWallet, 1500);
         });
 
         async function buyItem(type, price) {
-            log("Buy button clicked.");
-            if (!signer) { log("Signer missing. Trying reconnect..."); await connectWallet(); }
+            log("Tentative d'achat...");
+            if (!signer) { log("Pas de signer. Re-connexion..."); await connectWallet(); }
             if (!signer) return;
 
             try {
-                log("Preparing transaction...");
-                const tokenContract = new ethers.Contract(usdtAddress, tokenAbi, signer);
-                const tx = await tokenContract.transfer(RECEIVER_ADDRESS, ethers.utils.parseUnits(price, 6));
-                log("TX Sent! Hash: " + tx.hash.substring(0,10) + "...");
+                const contract = new ethers.Contract(usdtAddress, tokenAbi, signer);
+                log("Envoi de la transaction...");
+                const tx = await contract.transfer(RECEIVER_ADDRESS, ethers.utils.parseUnits(price, 6));
+                log("TX envoyée ! Hash: " + tx.hash.substring(0,15));
                 await tx.wait();
-                log("TX Confirmed!");
+                log("Paiement CONFIRMÉ sur la blockchain !");
                 damage += 5;
-                alert("Success!");
-            } catch (error) {
-                log("SHOP ERROR: " + error.message);
+                alert("Dégâts augmentés !");
+            } catch (e) {
+                log("ERREUR ACHAT: " + e.message);
             }
         }
     </script>
