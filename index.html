@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dragon Slayer - Final Fixed</title>
+    <title>Dragon Slayer - MiniPay Connect Fixed</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         body {
@@ -21,7 +21,6 @@
             touch-action: manipulation;
         }
 
-        /* --- HUD --- */
         .hud {
             width: 92%;
             display: flex;
@@ -49,7 +48,6 @@
             object-fit: contain;
         }
 
-        /* --- Zone de Combat --- */
         #game-area {
             position: relative;
             width: 90%;
@@ -62,7 +60,7 @@
         }
 
         #monster {
-            width: 12.5%; /* Taille 1/8eme */
+            width: 15%; 
             height: auto;
             aspect-ratio: 1 / 1;
             cursor: pointer;
@@ -105,12 +103,12 @@
         }
         .shop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        #wallet-status { font-size: 11px; color: #4caf50; margin: 5px 0; }
+        #wallet-status { font-size: 11px; color: #4caf50; margin: 5px 0; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="wallet-status">⏳ Initializing MiniPay...</div>
+    <div id="wallet-status">⏳ Searching for MiniPay...</div>
     
     <div class="hud">
         <div class="hud-left">
@@ -136,18 +134,19 @@
     </div>
 
     <script>
-        // --- ADRESSES OFFICIELLES ---
+        // --- CONFIGURATION ---
         const usdtAddress = "0x48065fbBE25f71C9282dd5e1cD6D6A887483D5e";
         const RECEIVER_ADDRESS = "0xE4A3A42142563adC08CcFE3Baf82dc207141732C"; 
-        
         const tokenAbi = ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"];
+        
         let provider, signer, userAddress;
 
-        // --- ÉTAT DU JEU ---
+        // --- GAME LOGIC ---
+        const hpPerLevel = [5, 10, 20, 40];
         let level = 1;
         const maxLevel = 4;
         let damage = 1;
-        let maxHp = 20;
+        let maxHp = hpPerLevel[0];
         let currentHp = maxHp;
         
         const monsterEl = document.getElementById('monster');
@@ -173,13 +172,10 @@
         }
 
         function moveMonster() {
-            // Sécurité : Le monstre ne peut pas dépasser 15% et 85% du cadre
             const minPos = 15;
             const maxPos = 85;
-
             const newX = Math.random() * (maxPos - minPos) + minPos;
             const newY = Math.random() * (maxPos - minPos) + minPos;
-            
             monsterEl.style.left = newX + "%";
             monsterEl.style.top = newY + "%";
         }
@@ -189,13 +185,13 @@
             updateUI();
             if (level >= maxLevel) {
                 setTimeout(() => {
-                    alert("🏆 CONGRATULATIONS! You defeated all dragons!");
+                    alert("🏆 VICTORY! You defeated all dragons!");
                     restartGame();
                 }, 200);
             } else {
                 setTimeout(() => {
                     level++;
-                    maxHp = Math.floor(maxHp * 2.5); 
+                    maxHp = hpPerLevel[level-1];
                     currentHp = maxHp;
                     monsterEl.style.left = "50%";
                     monsterEl.style.top = "50%";
@@ -206,7 +202,7 @@
         }
 
         function restartGame() {
-            level = 1; maxHp = 20; currentHp = maxHp; damage = 1;
+            level = 1; maxHp = hpPerLevel[0]; currentHp = maxHp; damage = 1;
             monsterEl.style.left = "50%"; monsterEl.style.top = "50%";
             updateVisuals(); updateUI();
         }
@@ -220,40 +216,46 @@
         function updateUI() {
             const percent = Math.max(0, (currentHp / maxHp) * 100);
             document.getElementById('health-bar').style.width = percent + "%";
-            document.getElementById('hp-text').textContent = currentHp + "/" + maxHp + " HP";
+            document.getElementById('hp-text').textContent = Math.max(0, currentHp) + "/" + maxHp + " HP";
             document.getElementById('level-display').textContent = level;
         }
 
-        // --- INITIALISATION MINIPAY ---
-        async function initMiniPay() {
+        // --- NOUVELLE LOGIQUE DE CONNEXION (Basée sur Quickstart) ---
+        async function connectWallet() {
+            // MiniPay injecte window.ethereum. On attend un peu pour être sûr.
             if (window.ethereum) {
                 try {
                     provider = new ethers.providers.Web3Provider(window.ethereum);
-                    // On demande explicitement les comptes au chargement
-                    const accounts = await provider.send("eth_requestAccounts", []);
+                    // Force la demande d'accès au compte
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     signer = provider.getSigner();
                     userAddress = accounts[0];
+                    
                     document.getElementById('wallet-status').textContent = "🟢 MiniPay Connected: " + userAddress.substring(0,6) + "...";
-                    document.getElementById('wallet-status').style.color = "#4caf50";
-                } catch (err) {
-                    console.error(err);
-                    document.getElementById('wallet-status').textContent = "🔴 Connection Failed";
+                    console.log("Connected to MiniPay:", userAddress);
+                } catch (error) {
+                    console.error("User denied account access", error);
+                    document.getElementById('wallet-status').textContent = "🔴 Connection Refused";
                 }
             } else {
-                document.getElementById('wallet-status').textContent = "🔴 MiniPay not found";
+                document.getElementById('wallet-status').textContent = "🔴 MiniPay not detected (Open in Opera Mini)";
             }
         }
 
-        window.addEventListener('load', initMiniPay);
+        // On tente la connexion dès que la page est chargée
+        window.addEventListener('load', () => {
+            // Petit délai de 500ms pour laisser MiniPay injecter ethereum
+            setTimeout(connectWallet, 500);
+        });
 
         // --- ACHAT ---
         async function buyItem(type, price) {
-            if (!signer) { 
-                // Tentative de reconnexion si le signer est perdu
-                await initMiniPay();
-                if (!signer) return alert("Please connect MiniPay!");
+            // Si pas connecté, on tente de reconnecter avant de bloquer
+            if (!signer) {
+                await connectWallet();
+                if (!signer) return alert("Wallet not connected. Please open in MiniPay!");
             }
-            
+
             const btn = document.getElementById('btn-' + type);
             const originalText = btn.innerHTML;
             btn.innerHTML = "⏳ Processing..."; 
@@ -262,18 +264,18 @@
             try {
                 const tokenContract = new ethers.Contract(usdtAddress, tokenAbi, signer);
                 const amountInWei = ethers.utils.parseUnits(price, 6); 
+                
+                // Transaction
                 const tx = await tokenContract.transfer(RECEIVER_ADDRESS, amountInWei);
+                await tx.wait(); // On attend la validation sur la blockchain
                 
-                // On attend la confirmation
-                await tx.wait();
-                
-                alert("Success! Damage Increased.");
+                alert("Success! Your damage is now " + (damage + 5));
                 damage += 5;
                 btn.innerHTML = "✅ Upgraded";
                 btn.style.backgroundColor = "#27ae60";
             } catch (error) {
-                console.error(error);
-                alert("Payment failed or rejected.");
+                console.error("Transaction Error:", error);
+                alert("Payment failed or cancelled.");
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
