@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Monster Slayer</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e; /* Darker theme */
+            color: #e94560;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            height: 100vh;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        #game-area {
+            position: relative;
+            width: 90%;
+            flex-grow: 1;
+            border: 2px dashed #16213e;
+            background-color: #16213e;
+            border-radius: 10px;
+            margin: 10px;
+            overflow: hidden;
+        }
+
+        #monster {
+            font-size: 80px;
+            cursor: pointer;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s;
+            filter: drop-shadow(0 0 10px rgba(233, 69, 96, 0.5));
+        }
+        #monster:active { transform: scale(0.9) translate(-50%, -50%); } 
+
+        /* HUD (Heads-Up Display) */
+        .hud {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            font-weight: bold;
+            color: white;
+        }
+
+        #health-bar-container {
+            width: 100%; height: 15px;
+            background-color: #0f3460;
+            border-radius: 10px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        #health-bar {
+            width: 100%; height: 100%;
+            background-color: #e94560;
+            transition: width 0.2s;
+        }
+
+        #shop {
+            background-color: #16213e;
+            width: 100%;
+            padding: 15px 0;
+            border-top: 2px solid #0f3460;
+            z-index: 10;
+        }
+
+        .shop-btn {
+            background-color: #0f3460;
+            border: 1px solid #e94560;
+            padding: 12px;
+            margin: 5px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            width: 80%;
+        }
+        .shop-btn:hover { background-color: #e94560; }
+        .shop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        #wallet-status {
+            font-size: 11px;
+            color: #4caf50;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="wallet-status">🔴 Wallet not connected</div>
+    
+    <div class="hud">
+        <span>Level <span id="level-display">1</span></span>
+        <span id="hp-text">10/10 HP</span>
+    </div>
+    
+    <div style="width: 90%;">
+        <div id="health-bar-container">
+            <div id="health-bar"></div>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <div id="monster" onclick="attackMonster()">👾</div>
+    </div>
+
+    <div id="shop">
+        <h3 style="margin-top: 0; color: #fff;">ITEM SHOP (USDT)</h3>
+        <button class="shop-btn" id="btn-weapon" onclick="buyItem('weapon', '0.01')">
+            ⚔️ Buy Power Sword (+5 Dmg)<br>
+            <small>Price: 0.01 USDT</small>
+        </button>
+    </div>
+
+    <script>
+        // --- 1. BLOCKCHAIN CONFIGURATION (CELO) ---
+        
+        // USDT Contract Address on Celo Mainnet
+        const usdtAddress = "0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e";
+        
+        // !!! REPLACE WITH YOUR PUBLIC ADDRESS !!!
+        const RECEIVER_ADDRESS = "0xE4A3A42142563adC08CcFE3Baf82dc207141732C"; 
+
+        // Minimal ABI (Interface) to interact with USDT
+        const tokenAbi = [
+          "function transfer(address to, uint256 amount) returns (bool)",
+          "function decimals() view returns (uint8)"
+        ];
+
+        let provider;
+        let signer;
+        let userAddress;
+
+        // --- 2. GAME LOGIC ---
+        let level = 1;
+        let damage = 1;
+        let maxHp = 10;
+        let currentHp = 10;
+        const monsterEl = document.getElementById('monster');
+        const gameArea = document.getElementById('game-area');
+
+        function attackMonster() {
+            currentHp -= damage;
+            if (currentHp <= 0) {
+                defeatMonster();
+            } else {
+                updateUI();
+                moveMonster();
+            }
+        }
+
+        function moveMonster() {
+            // Subtract monster size (approx 80px) so it stays inside
+            const maxX = gameArea.clientWidth - 80; 
+            const maxY = gameArea.clientHeight - 80;
+            
+            monsterEl.style.transform = "none"; 
+            monsterEl.style.left = Math.floor(Math.random() * maxX) + "px";
+            monsterEl.style.top = Math.floor(Math.random() * maxY) + "px";
+        }
+
+        function defeatMonster() {
+            level++;
+            maxHp = Math.floor(maxHp * 1.5);
+            currentHp = maxHp;
+            updateUI();
+            
+            // Reset position to center
+            monsterEl.style.top = "50%"; monsterEl.style.left = "50%";
+            monsterEl.style.transform = "translate(-50%, -50%)";
+            
+            // Visual feedback
+            monsterEl.innerHTML = "💥";
+            setTimeout(() => monsterEl.innerHTML = "👾", 300);
+        }
+
+        function updateUI() {
+            const percent = Math.max(0, (currentHp / maxHp) * 100);
+            document.getElementById('health-bar').style.width = percent + "%";
+            document.getElementById('hp-text').textContent = currentHp + "/" + maxHp + " HP";
+            document.getElementById('level-display').textContent = level;
+        }
+
+        // --- 3. MINIPAY / WEB3 LOGIC ---
+
+        window.onload = async function() {
+            if (window.ethereum && window.ethereum.isMiniPay) {
+                document.getElementById('wallet-status').textContent = "🟢 MiniPay Detected";
+                
+                try {
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    // Request wallet connection
+                    await provider.send("eth_requestAccounts", []);
+                    signer = provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    
+                    document.getElementById('wallet-status').textContent = "🟢 Connected: " + userAddress.substring(0,6) + "...";
+                } catch (err) {
+                    console.error("Connection denied", err);
+                    document.getElementById('wallet-status').textContent = "🔴 Connection Denied";
+                }
+            } else {
+                document.getElementById('wallet-status').textContent = "🔴 Please open in Opera Mini / MiniPay";
+                document.getElementById('wallet-status').style.color = "red";
+            }
+        };
+
+        async function buyItem(type, price) {
+            if (!signer) {
+                alert("Error: Wallet not connected. Please open in MiniPay.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-' + type);
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "⏳ Processing...";
+            btn.disabled = true;
+
+            try {
+                const tokenContract = new ethers.Contract(usdtAddress, tokenAbi, signer);
+
+                // IMPORTANT: USDT on Celo usually uses 6 decimals.
+                // We check it dynamically or assume 6. standard parseUnits is safer.
+                // 0.01 USDT = 10000 units (if 6 decimals)
+                let decimals = 6;
+                try {
+                    decimals = await tokenContract.decimals();
+                } catch(e) { console.log("Could not fetch decimals, assuming 6"); }
+
+                const amountInWei = ethers.utils.parseUnits(price, decimals);
+
+                // Send Transaction
+                const tx = await tokenContract.transfer(RECEIVER_ADDRESS, amountInWei);
+                
+                alert("Transaction sent! Waiting for confirmation...");
+                
+                // Wait for blockchain confirmation
+                await tx.wait();
+
+                alert("Payment Successful! Item Unlocked.");
+                
+                if (type === 'weapon') {
+                    damage += 5;
+                    btn.innerHTML = "✅ Purchased (+5 DMG)";
+                    // Change monster color to show we are stronger
+                    monsterEl.style.filter = "hue-rotate(90deg) drop-shadow(0 0 10px #e94560)";
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert("Payment Failed or Cancelled.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
