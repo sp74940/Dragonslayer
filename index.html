@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dragon Slayer - Dynamic Edition</title>
+    <title>Dragon Slayer - Fixed Boundaries</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         body {
@@ -38,10 +38,9 @@
         .hud-left { display: flex; align-items: center; }
 
         #dragon-portrait {
-            /* Portrait dynamique : 1/8ème de la largeur du HUD environ */
             width: 12.5vw; 
             height: 12.5vw;
-            max-width: 60px; /* Limite pour les grands écrans */
+            max-width: 60px;
             max-height: 60px;
             border-radius: 5px;
             border: 2px solid #e94560;
@@ -50,7 +49,7 @@
             object-fit: contain;
         }
 
-        /* --- Zone de Jeu --- */
+        /* --- Zone de Combat --- */
         #game-area {
             position: relative;
             width: 90%;
@@ -59,24 +58,23 @@
             background-color: #16213e;
             border-radius: 10px;
             margin: 10px;
-            overflow: hidden;
+            overflow: hidden; /* Empêche tout débordement visuel */
         }
 
         #monster {
-            /* TAILLE DYNAMIQUE : 1/8ème de la largeur de la zone (approx 12.5%) */
-            width: 12.5%; 
+            width: 12.5%; /* 1/8 de la largeur */
             height: auto;
-            aspect-ratio: 1 / 1; /* Force le carré */
+            aspect-ratio: 1 / 1;
             cursor: pointer;
             position: absolute;
             top: 50%; 
             left: 50%;
-            /* Centrage dynamique */
-            transform: translate(-50%, -50%);
-            transition: transform 0.05s, top 0.1s, left 0.1s;
+            transform: translate(-50%, -50%); /* Centrage sur le point de coordonnées */
+            transition: transform 0.05s, top 0.15s ease-out, left 0.15s ease-out;
             object-fit: contain;
             filter: drop-shadow(0 0 10px rgba(0,0,0,0.7));
             -webkit-user-drag: none;
+            z-index: 5;
         }
 
         #health-bar-container {
@@ -126,7 +124,7 @@
         <div id="health-bar"></div>
     </div>
 
-    <div id="game-area" id="combat-zone">
+    <div id="game-area">
         <img id="monster" src="" onclick="attackMonster()" alt="Dragon">
     </div>
 
@@ -138,12 +136,14 @@
     </div>
 
     <script>
+        // --- CONFIGURATION ---
         const usdtAddress = "0x48065fbBE25f71C9282dd5e1cD6D6A887483D5e";
         const RECEIVER_ADDRESS = "0xE4A3A42142563adC08CcFE3Baf82dc207141732C"; 
         
         const tokenAbi = ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"];
         let provider, signer, userAddress;
 
+        // --- GAME STATE ---
         let level = 1;
         const maxLevel = 4;
         let damage = 1;
@@ -161,8 +161,8 @@
             if (currentHp <= 0) return;
             currentHp -= damage;
             
-            // Animation de dégâts (on garde le translate pour le centrage)
-            monsterEl.style.transform = "translate(-50%, -50%) scale(0.8) rotate(" + (Math.random()*10 - 5) + "deg)";
+            // Feedback de dégâts
+            monsterEl.style.transform = "translate(-50%, -50%) scale(0.85) rotate(" + (Math.random()*12 - 6) + "deg)";
             setTimeout(() => { monsterEl.style.transform = "translate(-50%, -50%) scale(1)"; }, 50);
 
             if (currentHp <= 0) {
@@ -174,25 +174,20 @@
         }
 
         function moveMonster() {
-            // Calcul dynamique basé sur la largeur réelle de la zone
             const zoneWidth = gameArea.clientWidth;
             const zoneHeight = gameArea.clientHeight;
             
-            // La taille du monstre est 12.5% (1/8) de la largeur
-            const monsterSize = zoneWidth * 0.125;
+            // Marge de sécurité (15% pour être sûr que les bords ne touchent pas le cadre)
+            const marginPercent = 15; 
+            const minPos = marginPercent;
+            const maxPos = 100 - marginPercent;
+
+            // Calcul de la position aléatoire en pourcentage du cadre
+            const newX = Math.random() * (maxPos - minPos) + minPos;
+            const newY = Math.random() * (maxPos - minPos) + minPos;
             
-            // On calcule les positions en laissant une marge pour que le centre 
-            // du monstre ne sorte pas (en tenant compte du translate(-50%, -50%))
-            const minPos = 10; // Marge bordure
-            const maxX = zoneWidth - monsterSize;
-            const maxY = zoneHeight - monsterSize;
-            
-            const newX = Math.random() * (maxX - minPos) + minPos;
-            const newY = Math.random() * (maxY - minPos) + minPos;
-            
-            // On utilise des pourcentages pour que ça reste fluide si on tourne l'écran
-            monsterEl.style.left = (newX / zoneWidth * 100) + "%";
-            monsterEl.style.top = (newY / zoneHeight * 100) + "%";
+            monsterEl.style.left = newX + "%";
+            monsterEl.style.top = newY + "%";
         }
 
         function defeatMonster() {
@@ -208,7 +203,6 @@
                     level++;
                     maxHp = Math.floor(maxHp * 2.5); 
                     currentHp = maxHp;
-                    // Reset au centre
                     monsterEl.style.left = "50%";
                     monsterEl.style.top = "50%";
                     updateVisuals();
@@ -236,6 +230,7 @@
             document.getElementById('level-display').textContent = level;
         }
 
+        // --- BLOCKCHAIN LOGIC ---
         window.onload = async function() {
             if (window.ethereum && window.ethereum.isMiniPay) {
                 document.getElementById('wallet-status').textContent = "🟢 MiniPay Connected";
@@ -263,7 +258,7 @@
                 btn.innerHTML = "✅ Sword Upgraded";
                 btn.style.backgroundColor = "#27ae60";
             } catch (error) {
-                alert("Failed.");
+                alert("Transaction failed.");
                 btn.innerHTML = "⚔️ Power Sword (+5 Dmg) - 0.01 USDT";
                 btn.disabled = false;
             }
