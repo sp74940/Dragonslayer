@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dragon Slayer - Live</title>
+    <title>Dragon Slayer - MiniPay Edition</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         body {
@@ -20,6 +20,7 @@
             overflow: hidden;
         }
 
+        /* --- HUD --- */
         .hud {
             width: 92%;
             display: flex;
@@ -45,6 +46,7 @@
             object-fit: contain;
         }
 
+        /* --- Zone de Jeu --- */
         #game-area {
             position: relative;
             width: 90%;
@@ -57,24 +59,26 @@
         }
 
         #monster {
-            width: 200px; 
-            height: 200px;
+            width: 180px; 
+            height: 180px;
             cursor: pointer;
             position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            transition: transform 0.05s;
+            top: 50%; 
+            left: 50%;
+            /* Centrage initial via margins pour ne pas bloquer le mouvement JS */
+            margin-left: -90px;
+            margin-top: -90px;
+            transition: transform 0.05s, top 0.1s, left 0.1s;
             object-fit: contain;
             filter: drop-shadow(0 0 15px rgba(0,0,0,0.7));
             -webkit-user-drag: none;
         }
-        #monster:active { transform: scale(0.9) translate(-50%, -50%); } 
 
         #health-bar-container {
             width: 90%; height: 15px;
             background-color: #0f3460;
             border-radius: 10px;
-            margin: 5px 0;
+            margin: 10px 0;
             overflow: hidden;
         }
         #health-bar {
@@ -129,13 +133,14 @@
     </div>
 
     <script>
-        // --- ADRESSES MISES À JOUR ---
+        // --- ADRESSES OFFICIELLES ---
         const usdtAddress = "0x48065fbBE25f71C9282dd522D51915B95aEeaa18";
         const RECEIVER_ADDRESS = "0xE4A3A42142563adC08CcFE3Baf82dc207141732C"; 
         
         const tokenAbi = ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"];
         let provider, signer, userAddress;
 
+        // --- ÉTAT DU JEU ---
         let level = 1;
         const maxLevel = 4;
         let damage = 1;
@@ -144,7 +149,9 @@
         
         const monsterEl = document.getElementById('monster');
         const portraitEl = document.getElementById('dragon-portrait');
+        const gameArea = document.getElementById('game-area');
 
+        // Initialisation
         updateVisuals(); 
         updateUI();
 
@@ -152,23 +159,30 @@
             if (currentHp <= 0) return;
             currentHp -= damage;
             
-            monsterEl.style.transform = "translate(-50%, -50%) scale(0.9) rotate(" + (Math.random()*8 - 4) + "deg)";
-            setTimeout(() => monsterEl.style.transform = "translate(-50%, -50%)", 50);
+            // Effet visuel de secousse
+            monsterEl.style.transform = "scale(0.9) rotate(" + (Math.random()*10 - 5) + "deg)";
+            setTimeout(() => { monsterEl.style.transform = "scale(1) rotate(0deg)"; }, 50);
 
             if (currentHp <= 0) {
                 defeatMonster();
             } else {
                 updateUI();
-                moveMonster();
+                moveMonster(); // Mouvement aléatoire après chaque clic
             }
         }
 
         function moveMonster() {
-            const maxX = gameArea.clientWidth - 200; 
-            const maxY = gameArea.clientHeight - 200;
-            monsterEl.style.left = Math.floor(Math.random() * maxX) + "px";
-            monsterEl.style.top = Math.floor(Math.random() * maxY) + "px";
-            monsterEl.style.transform = "none"; 
+            // Calcul des limites pour éviter que le dragon sorte (taille image 180px)
+            const maxX = gameArea.clientWidth - 180; 
+            const maxY = gameArea.clientHeight - 180;
+            
+            const newX = Math.floor(Math.random() * maxX);
+            const newY = Math.floor(Math.random() * maxY);
+            
+            // Suppression des marges de centrage pour le mouvement libre
+            monsterEl.style.margin = "0"; 
+            monsterEl.style.left = newX + "px";
+            monsterEl.style.top = newY + "px";
         }
 
         function defeatMonster() {
@@ -177,7 +191,7 @@
 
             if (level >= maxLevel) {
                 setTimeout(() => {
-                    alert("🏆 VICTORY! You are the ultimate Dragon Slayer!");
+                    alert("🏆 CONGRATULATIONS! The dragons are defeated!");
                     if(confirm("Play again?")) restartGame();
                 }, 200);
             } else {
@@ -185,8 +199,13 @@
                     level++;
                     maxHp = Math.floor(maxHp * 2.5); 
                     currentHp = maxHp;
-                    monsterEl.style.top = "50%"; monsterEl.style.left = "50%";
-                    monsterEl.style.transform = "translate(-50%, -50%)";
+                    
+                    // Remise au centre pour le nouveau monstre
+                    monsterEl.style.left = "50%";
+                    monsterEl.style.top = "50%";
+                    monsterEl.style.marginLeft = "-90px";
+                    monsterEl.style.marginTop = "-90px";
+                    
                     updateVisuals();
                     updateUI();
                 }, 100);
@@ -195,6 +214,8 @@
 
         function restartGame() {
             level = 1; maxHp = 20; currentHp = maxHp; damage = 1;
+            monsterEl.style.left = "50%"; monsterEl.style.top = "50%";
+            monsterEl.style.marginLeft = "-90px"; monsterEl.style.marginTop = "-90px";
             updateVisuals(); updateUI();
         }
 
@@ -211,6 +232,7 @@
             document.getElementById('level-display').textContent = level;
         }
 
+        // --- CONNEXION MINIPAY ---
         window.onload = async function() {
             if (window.ethereum && window.ethereum.isMiniPay) {
                 document.getElementById('wallet-status').textContent = "🟢 MiniPay Connected";
@@ -219,11 +241,15 @@
                     await provider.send("eth_requestAccounts", []);
                     signer = provider.getSigner();
                     userAddress = await signer.getAddress();
-                    document.getElementById('wallet-status').textContent = "🟢 " + userAddress.substring(0,6) + "...";
+                    document.getElementById('wallet-status').textContent = "🟢 Connected: " + userAddress.substring(0,6) + "...";
                 } catch (err) { console.error(err); }
+            } else {
+                document.getElementById('wallet-status').textContent = "🔴 Open in Opera Mini / MiniPay";
+                document.getElementById('wallet-status').style.color = "orange";
             }
         };
 
+        // --- ACHAT USDT ---
         async function buyItem(type, price) {
             if (!signer) { alert("Connect MiniPay first!"); return; }
             const btn = document.getElementById('btn-' + type);
@@ -233,12 +259,12 @@
                 const amountInWei = ethers.utils.parseUnits(price, 6); 
                 const tx = await tokenContract.transfer(RECEIVER_ADDRESS, amountInWei);
                 await tx.wait();
-                alert("Payment Received! Your Power Sword is ready.");
+                alert("Payment Received! Damage +5");
                 damage += 5;
                 btn.innerHTML = "✅ Sword Upgraded";
                 btn.style.backgroundColor = "#27ae60";
             } catch (error) {
-                alert("Payment Cancelled.");
+                alert("Payment Failed.");
                 btn.innerHTML = "⚔️ Power Sword (+5 Dmg) - 0.01 USDT";
                 btn.disabled = false;
             }
