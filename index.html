@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dragon Slayer - MiniPay Connect</title>
+    <title>Dragon Slayer - Connection Fix</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         body {
@@ -90,7 +90,7 @@
 
         #shop {
             background-color: #16213e;
-            width: 100%; padding: 15px 0;
+            width: 100%; padding: 10px 0;
             border-top: 2px solid #0f3460;
             z-index: 10;
         }
@@ -103,12 +103,19 @@
         }
         .shop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        #wallet-status { font-size: 11px; color: #4caf50; margin: 5px 0; font-weight: bold; }
+        #wallet-status { 
+            font-size: 11px; 
+            color: #e94560; 
+            margin: 5px 0; 
+            font-weight: bold;
+            cursor: pointer; /* Rend le statut cliquable pour forcer la connexion */
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 
-    <div id="wallet-status">⏳ Recherche de MiniPay...</div>
+    <div id="wallet-status" onclick="connectWallet()">⏳ Cliquer ici pour connecter MiniPay</div>
     
     <div class="hud">
         <div class="hud-left">
@@ -127,26 +134,24 @@
     </div>
 
     <div id="shop">
-        <h3 style="margin-top: 0; color: #fff; font-size: 16px;">BOUTIQUE (USDT)</h3>
+        <h3 style="margin-top: 0; color: #fff; font-size: 14px;">BOUTIQUE (USDT)</h3>
         <button class="shop-btn" id="btn-weapon" onclick="buyItem('weapon', '0.01')">
-            ⚔️ Épée de Puissance (+5 Dégâts) - 0.01 USDT
+            ⚔️ Épée (+5 Dégâts) - 0.01 USDT
         </button>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const usdtAddress = "0x48065fbBE25f71C9282dd5e1cD6D6A887483D5e";
         const RECEIVER_ADDRESS = "0xE4A3A42142563adC08CcFE3Baf82dc207141732C"; 
         const tokenAbi = ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"];
         
         let provider, signer, userAddress;
 
-        // --- GAME LOGIC ---
-        const hpPerLevel = [5, 10, 20, 40]; // Tes paliers : 5, 10, 20, 40 clics
+        const hpPerLevel = [5, 10, 20, 40];
         let level = 1;
         const maxLevel = 4;
         let damage = 1;
-        let maxHp = hpPerLevel[0]; // Correction ici : démarre bien à 5
+        let maxHp = hpPerLevel[0];
         let currentHp = maxHp;
         
         const monsterEl = document.getElementById('monster');
@@ -159,35 +164,24 @@
         function attackMonster() {
             if (currentHp <= 0) return;
             currentHp -= damage;
-            
             monsterEl.style.transform = "translate(-50%, -50%) scale(0.8) rotate(" + (Math.random()*12 - 6) + "deg)";
             setTimeout(() => { monsterEl.style.transform = "translate(-50%, -50%) scale(1)"; }, 50);
-
-            if (currentHp <= 0) {
-                defeatMonster();
-            } else {
-                updateUI();
-                moveMonster();
-            }
+            if (currentHp <= 0) defeatMonster();
+            else { updateUI(); moveMonster(); }
         }
 
         function moveMonster() {
             const minPos = 15;
             const maxPos = 85;
-            const newX = Math.random() * (maxPos - minPos) + minPos;
-            const newY = Math.random() * (maxPos - minPos) + minPos;
-            monsterEl.style.left = newX + "%";
-            monsterEl.style.top = newY + "%";
+            monsterEl.style.left = (Math.random() * (maxPos - minPos) + minPos) + "%";
+            monsterEl.style.top = (Math.random() * (maxPos - minPos) + minPos) + "%";
         }
 
         function defeatMonster() {
             currentHp = 0;
             updateUI();
             if (level >= maxLevel) {
-                setTimeout(() => {
-                    alert("🏆 FÉLICITATIONS ! Tous les dragons sont vaincus !");
-                    restartGame();
-                }, 200);
+                setTimeout(() => { alert("🏆 VICTOIRE !"); restartGame(); }, 200);
             } else {
                 setTimeout(() => {
                     level++;
@@ -202,79 +196,66 @@
         }
 
         function restartGame() {
-            level = 1; 
-            maxHp = hpPerLevel[0]; 
-            currentHp = maxHp; 
-            damage = 1;
-            monsterEl.style.left = "50%"; 
-            monsterEl.style.top = "50%";
-            updateVisuals(); 
-            updateUI();
+            level = 1; maxHp = hpPerLevel[0]; currentHp = maxHp; damage = 1;
+            monsterEl.style.left = "50%"; monsterEl.style.top = "50%";
+            updateVisuals(); updateUI();
         }
 
         function updateVisuals() {
-            const imagePath = "img/dragon" + level + ".png";
-            monsterEl.src = imagePath;
-            portraitEl.src = imagePath;
+            monsterEl.src = "img/dragon" + level + ".png";
+            portraitEl.src = "img/dragon" + level + ".png";
         }
 
         function updateUI() {
-            const percent = Math.max(0, (currentHp / maxHp) * 100);
-            document.getElementById('health-bar').style.width = percent + "%";
+            document.getElementById('health-bar').style.width = Math.max(0, (currentHp / maxHp) * 100) + "%";
             document.getElementById('hp-text').textContent = Math.max(0, currentHp) + "/" + maxHp + " HP";
             document.getElementById('level-display').textContent = level;
         }
 
-        // --- NOUVELLE LOGIQUE DE CONNEXION ROBUSTE ---
+        // --- CORRECTION CONNEXION ---
         async function connectWallet() {
             if (window.ethereum) {
+                document.getElementById('wallet-status').textContent = "⏳ Tentative...";
                 try {
-                    // Utilisation de la méthode request préconisée par MiniPay
+                    // Utilisation de la méthode standard recommandée
                     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     provider = new ethers.providers.Web3Provider(window.ethereum);
                     signer = provider.getSigner();
                     userAddress = accounts[0];
-                    
-                    document.getElementById('wallet-status').textContent = "🟢 MiniPay Connecté : " + userAddress.substring(0,6) + "...";
+                    document.getElementById('wallet-status').textContent = "🟢 Connecté : " + userAddress.substring(0,6) + "...";
+                    document.getElementById('wallet-status').style.color = "#4caf50";
+                    document.getElementById('wallet-status').style.textDecoration = "none";
                 } catch (error) {
-                    console.error("Accès refusé", error);
-                    document.getElementById('wallet-status').textContent = "🔴 Connexion refusée";
+                    console.error(error);
+                    document.getElementById('wallet-status').textContent = "🔴 Connexion refusée (Cliquez ici)";
                 }
             } else {
                 document.getElementById('wallet-status').textContent = "🔴 MiniPay non détecté";
             }
         }
 
-        // Tentative au chargement avec un léger délai pour l'injection
+        // Auto-connect avec délai plus long
         window.addEventListener('load', () => {
-            setTimeout(connectWallet, 1000);
+            setTimeout(connectWallet, 2000); 
         });
 
-        // --- ACHAT ---
         async function buyItem(type, price) {
             if (!signer) {
                 await connectWallet();
-                if (!signer) return alert("Veuillez ouvrir le jeu dans MiniPay !");
+                if (!signer) return;
             }
-
             const btn = document.getElementById('btn-' + type);
             const originalText = btn.innerHTML;
-            btn.innerHTML = "⏳ Signature..."; 
-            btn.disabled = true;
-
+            btn.innerHTML = "⏳ Signature..."; btn.disabled = true;
             try {
                 const tokenContract = new ethers.Contract(usdtAddress, tokenAbi, signer);
-                const amountInWei = ethers.utils.parseUnits(price, 6); 
-                
-                const tx = await tokenContract.transfer(RECEIVER_ADDRESS, amountInWei);
+                const tx = await tokenContract.transfer(RECEIVER_ADDRESS, ethers.utils.parseUnits(price, 6));
                 await tx.wait(); 
-                
-                alert("Succès ! Dégâts actuels : " + (damage + 5));
                 damage += 5;
+                alert("Succès ! Dégâts : " + damage);
                 btn.innerHTML = "✅ Amélioré";
                 btn.style.backgroundColor = "#27ae60";
             } catch (error) {
-                console.error("Erreur de transaction :", error);
                 alert("Paiement échoué.");
                 btn.innerHTML = originalText;
                 btn.disabled = false;
